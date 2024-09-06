@@ -23,6 +23,7 @@ import sys
 import time
 from multiprocess import set_start_method
 from datetime import timedelta
+import json
 
 from tqdm import tqdm
 from pathlib import Path
@@ -67,6 +68,7 @@ from training.eval import clap_similarity, wer, si_sdr
 
 logger = logging.getLogger(__name__)
 
+from datasets import load_from_disk
 
 def main():
     # See all possible arguments in src/transformers/training_args.py
@@ -242,24 +244,26 @@ def main():
             columns_to_keep["description_column_name"] = data_args.description_column_name
 
         if training_args.do_train:
-            raw_datasets["train"] = load_multiple_datasets(
-                accelerator,
-                data_args.train_dataset_name,
-                data_args.train_dataset_config_name,
-                metadata_dataset_names=data_args.train_metadata_dataset_name,
-                splits=data_args.train_split_name,
-                dataset_samples=data_args.train_dataset_samples,
-                seed=training_args.seed,
-                cache_dir=model_args.cache_dir,
-                num_proc=data_args.preprocessing_num_workers,
-                id_column_name=data_args.id_column_name,
-                columns_to_keep=columns_to_keep.values(),
-                prompt_column_name=data_args.prompt_column_name,
-                audio_column_name=data_args.target_audio_column_name,
-                sampling_rate=sampling_rate,
-                logger=logger,
-                # streaming=data_args.streaming, TODO(SG): optionally enable streaming mode
-            )
+            # raw_datasets["train"] = load_multiple_datasets(
+            #     accelerator,
+            #     data_args.train_dataset_name,
+            #     data_args.train_dataset_config_name,
+            #     metadata_dataset_names=data_args.train_metadata_dataset_name,
+            #     splits=data_args.train_split_name,
+            #     dataset_samples=data_args.train_dataset_samples,
+            #     seed=training_args.seed,
+            #     cache_dir=model_args.cache_dir,
+            #     num_proc=data_args.preprocessing_num_workers,
+            #     id_column_name=data_args.id_column_name,
+            #     columns_to_keep=columns_to_keep.values(),
+            #     prompt_column_name=data_args.prompt_column_name,
+            #     audio_column_name=data_args.target_audio_column_name,
+            #     sampling_rate=sampling_rate,
+            #     logger=logger,
+            #     # streaming=data_args.streaming, TODO(SG): optionally enable streaming mode
+            # )
+
+            raw_datasets['train'] = load_from_disk(data_args.train_dataset_name)
 
             for key in columns_to_keep:
                 if columns_to_keep[key] not in raw_datasets["train"].column_names:
@@ -273,24 +277,26 @@ def main():
                 raw_datasets["train"] = raw_datasets["train"].select(range(data_args.max_train_samples))
 
         if training_args.do_eval:
-            raw_datasets["eval"] = load_multiple_datasets(
-                accelerator,
-                data_args.eval_dataset_name if data_args.eval_dataset_name else data_args.train_dataset_name,
-                data_args.eval_dataset_config_name
-                if data_args.eval_dataset_config_name
-                else data_args.train_dataset_config_name,
-                metadata_dataset_names=data_args.eval_metadata_dataset_name,
-                splits=data_args.eval_split_name,
-                cache_dir=model_args.cache_dir,
-                num_proc=data_args.preprocessing_num_workers,
-                id_column_name=data_args.id_column_name,
-                columns_to_keep=columns_to_keep.values(),
-                prompt_column_name=data_args.prompt_column_name,
-                audio_column_name=data_args.target_audio_column_name,
-                sampling_rate=sampling_rate,
-                logger=logger,
-                # streaming=data_args.streaming, TODO(SG): optionally enable streaming mode
-            )
+            # raw_datasets["eval"] = load_multiple_datasets(
+            #     accelerator,
+            #     data_args.eval_dataset_name if data_args.eval_dataset_name else data_args.train_dataset_name,
+            #     data_args.eval_dataset_config_name
+            #     if data_args.eval_dataset_config_name
+            #     else data_args.train_dataset_config_name,
+            #     metadata_dataset_names=data_args.eval_metadata_dataset_name,
+            #     splits=data_args.eval_split_name,
+            #     cache_dir=model_args.cache_dir,
+            #     num_proc=data_args.preprocessing_num_workers,
+            #     id_column_name=data_args.id_column_name,
+            #     columns_to_keep=columns_to_keep.values(),
+            #     prompt_column_name=data_args.prompt_column_name,
+            #     audio_column_name=data_args.target_audio_column_name,
+            #     sampling_rate=sampling_rate,
+            #     logger=logger,
+            #     # streaming=data_args.streaming, TODO(SG): optionally enable streaming mode
+            # )
+
+            raw_datasets['eval'] = load_from_disk(data_args.train_dataset_name)
 
             if data_args.max_eval_samples is not None:
                 with accelerator.local_main_process_first():
@@ -385,7 +391,7 @@ def main():
             batch = {}
 
             batch["input_ids"] = description_tokenizer(description.strip())["input_ids"]
-            batch["prompt_input_ids"] = prompt_tokenizer(prompt.strip())["input_ids"]
+            batch["prompt_input_ids"] = prompt_tokenizer(prompt[0]['content'].strip())["input_ids"]
 
             return batch
 
